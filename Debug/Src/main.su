@@ -1,11 +1,11 @@
 main.c:196:6:SystemClock_Config	96	static
 main.c:463:6:HAL_TIM_IC_CaptureCallback	0	static
-main.c:501:6:printWelcomeMessage	8	static
-main.c:508:9:readUserInput	16	static
-main.c:517:9:processUserInput	416	static
+main.c:502:6:printWelcomeMessage	8	static
+main.c:509:9:readUserInput	16	static
+main.c:518:9:processUserInput	720	static
 main.c:127:5:main	80	static
-main.c:577:10:pid_controller	8	static
-main.c:624:6:update_my_position	64	static
+main.c:586:10:pid_controller	8	static
+main.c:633:6:update_my_position	48	static
 main.c:477:6:HAL_TIM_OC_DelayElapsedCallback	16	static
 main.c:648:6:calculate_new_speed	0	static
 main.c:700:6:Error_Handler	0	static

@@ -80,7 +80,7 @@ uint16_t returned_pwm2 = 0;
 
 uint8_t i = 0;
 uint8_t give_command = 0;
-uint16_t D = 100;
+uint16_t b = 100;
 
 struct rover_position
 {
@@ -481,14 +481,15 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 	if ((htim->Instance == TIM4) && (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) && give_command == 1)
 	{
 		HAL_GPIO_TogglePin(GPIOA, LD2_Pin);
-		update_my_position();
-		calculate_new_speed();
 
 		n_pulse1 = input_capture1 - input_capture_prev1;
 		input_capture_prev1 = input_capture1;
 
 		n_pulse2 = input_capture2 - input_capture_prev2;
 		input_capture_prev2 = input_capture2;
+
+		update_my_position();
+		calculate_new_speed();
 
 		returned_pwm1 = pid_controller(n_pulse1, n_pulse_set1, 1);
 		returned_pwm2 = pid_controller(n_pulse2, n_pulse_set2, 2);
@@ -515,11 +516,13 @@ uint8_t readUserInput(void) {
 
 
 uint8_t processUserInput(uint8_t opt) {
-	char msg0[100] = "\r\nYour input for PWM is: ";
+	char msg0[100] = "\r\nYour desired speed is: ";
 	char msg1[100];
 	char msg2[100];
 	char msg3[100];
 	char msg4[100];
+	char msg5[100];
+	char msg6[100];
 	char readN_PULSE[3];
 	uint16_t n_pulse_received1 = 0;
 
@@ -549,22 +552,20 @@ uint8_t processUserInput(uint8_t opt) {
 		break;
 
 	case 2: // Print out speed
-		sprintf(msg1, "\r\nx: %ld", my_rover.x/10);
-		sprintf(msg2, "\r\nx: %ld", my_rover.y/10);
-		sprintf(msg3, "\r\nx: %ld", my_rover.phi);
+		sprintf(msg1, "\r\n x: %ld", my_rover.x);
+		sprintf(msg2, "\r\n y: %ld", my_rover.y);
+		sprintf(msg3, "\r\n phi: %ld", my_rover.phi);
+		sprintf(msg4, "\r\n PWM: %u", returned_pwm1);
+		sprintf(msg5, "\r\n error1: %ld", error1);
+		sprintf(msg6, "\r\n integrated_error1: %ld", integrated_error1);
 
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg3, strlen(msg3), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg3), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg5, strlen(msg5), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg6, strlen(msg6), HAL_MAX_DELAY);
 
-//		sprintf(msg1, "\r\nn_pulse1: %lu", n_pulse1); // RPM x 10^2
-//		sprintf(msg2, "\r\nreturn_pwm1: %d", returned_pwm1); // RPM x 10^2
-//		sprintf(msg3, "\r\nintegrated_error1: %li", integrated_error1);
-//		sprintf(msg4, "\r\nerror1: %li", error1);
-//		HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-//		HAL_UART_Transmit(&huart2, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-//		HAL_UART_Transmit(&huart2, (uint8_t*)msg3, strlen(msg3), HAL_MAX_DELAY);
-//		HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg4), HAL_MAX_DELAY);
 		break;
 
 	case 3:
@@ -576,7 +577,7 @@ uint8_t processUserInput(uint8_t opt) {
 
 uint16_t pid_controller(uint16_t current_point, uint16_t desired_point, uint8_t wheel_id)
 {
-	int32_t Kp = -10;
+	int32_t Kp = -15;
 	int32_t Ki = -15;
 
 	int32_t output_pwm = 0;
@@ -588,7 +589,7 @@ uint16_t pid_controller(uint16_t current_point, uint16_t desired_point, uint8_t 
 		error1 = desired_point - current_point;
 		output_pwm = (Kp*error1) + (Ki*integrated_error1);
 
-		if ((abs(integrated_error1)<20) || ((error1*integrated_error1)<=0)) // anti winding
+		if ((abs(integrated_error1)<25) || ((error1*integrated_error1)<=0)) // anti winding
 		{
 			integrated_error1 += error1;
 		}
@@ -623,69 +624,25 @@ uint16_t pid_controller(uint16_t current_point, uint16_t desired_point, uint8_t 
 
 void update_my_position(void)
 {
-	int32_t v_wheel1;
-	int32_t v_wheel2;
-	int32_t v_s;
-	int32_t w;
-	int32_t v_x;
-	int32_t v_y;
+	int32_t s1 = 0;
+	int32_t s2 = 0;
+	int32_t s_mean = 0;
 
-	v_wheel1 = wheel_dir1*93*n_pulse1; // C*(n_pulse1/270)*(1/0.1)*2pi*R with R = 40mm, and C = 10 to increase precision
-									   // therefore, the unit is 10*mm/s
-	v_wheel2 = wheel_dir2*93*n_pulse2;
+	s1 = 280*n_pulse1; // in 10*mm
+	s2 = 280*n_pulse2; // in 10*mm
+	s_mean = (s1+s2)/2;
 
-	v_s = (v_wheel1 + v_wheel2)/2; // in 10*mm/s
-
-	v_x = v_s*cos((my_rover.phi)/100.0); //in 10*mm/s
-	v_y = v_s*sin((my_rover.phi)/100.0);
-	w = (v_wheel1 - v_wheel2)/D; // in 10*radian/s
-
-	my_rover.x += v_x*0.05; // unit is 10*mm
-	my_rover.y += v_y*0.05;
-	my_rover.phi += 10*w*0.05; // unit is 100*radian
+	my_rover.phi += 10*(s2-s1)/(2*b); // in 100*rad
+	my_rover.x += s_mean*cos(((float)my_rover.phi)/100.0); // in 10*mm
+	my_rover.y += s_mean*sin(((float)my_rover.phi)/100.0); // in 10*mm
 }
 
 void calculate_new_speed(void)
 {
-	int32_t dx, dy, dphi;
+	int32_t v_s, w, v1, v2;
 
-	dx = my_rover.trg_x - my_rover.x;
-	dy = my_rover.trg_y - my_rover.y;
-
-	if (dy != 0)
-	{
-		dphi = (atan(((double)dx)/dy)*100); // in 100*rad
-		if (dy<0)
-		{
-			dphi = -dphi;
-		}
-		else
-		{
-			if (dphi > 0)
-			{
-				dphi = 314 - dphi;
-			}
-			else
-			{
-				dphi = dphi - 314;
-			}
-		}
-	}
-	else
-	{
-		if (dx == 0)
-		{
-			dphi = 0;
-		}
-		else if (dx<0)
-		{
-			dphi = 157;
-		}
-		else if (dx>0)
-		{
-			dphi = -157;
-		}
-	}
+	v1 = (2*v_s+w*b)/2;
+	v2 = (2*v_s-w*b)/2;
 
 
 
