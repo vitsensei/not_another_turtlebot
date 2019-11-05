@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="Rover Platform">
+
+  <material name="blue">
+    <color rgba="0 0 0.8 1"/>
+  </material>
+
+  <material name="grey">
+    <color rgba="0.2 0.2 0 1"/>
+  </material>	
+
+  <xacro:macro name="default_origin">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </xacro:macro>
+  
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="1.0 1.0 0.2"/>
+      </geometry>
+      <xacro:default_origin />
+      <material name="blue"/>
+
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="1.0 1.0 0.2"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="5"/>
+      <inertia ixx="0.83333" ixy="0.0" ixz="0.0" iyy="0.433333" iyz="0.0" izz="0.433333"/>
+    </inertial>
+  
+  </link>
+
+  <link name="right_wheel_holder_link">
+
+    <visual>
+      <xacro:default_origin />
+      <geometry>
+        <box size="0.3 0.2 0.2"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.3 0.2 0.2"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.011" ixy="0.0" ixz="0.0" iyy="0.0067" iyz="0.0" izz="0.011"/>
+    </inertial>
+
+  </link>
+
+  <link name="left_wheel_holder_link">
+
+    <visual>
+      <xacro:default_origin />
+      <geometry>
+        <box size="0.3 0.2 0.2"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.3 0.2 0.2"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.011" ixy="0.0" ixz="0.0" iyy="0.0067" iyz="0.0" izz="0.011"/>
+    </inertial>
+
+  </link>
+
+  <link name="right_wheel_link">
+
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.00021" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.00021"/>
+    </inertial>
+
+  </link>
+
+  <link name="left_wheel_link">
+
+    <visual>
+    	<origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.00021" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.00021"/>
+    </inertial>
+
+  </link>
+
+  <joint name="base_to_right_wheel_holder" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_wheel_holder_link"/>
+    <origin rpy="0 0 0" xyz="0.4 0.2 -0.2"/>
+  </joint>
+
+  <joint name="base_to_left_wheel_holder" type="fixed">
+    <parent link="base_link"/>
+    <child link="left_wheel_holder_link"/>
+    <origin rpy="0 0 0" xyz="-0.4 0.2 -0.2"/>
+  </joint>
+
+  <joint name="left_wheel_holder_to_left_wheel" type="continuous">
+  	<axis xyz="0 0 1"/>
+    <parent link="left_wheel_holder_link"/>
+    <child link="left_wheel_link"/>
+    <origin rpy="0 -1.57075 0" xyz="-0.15 0 0"/>
+  </joint>
+
+  <joint name="right_wheel_holder_to_right_wheel" type="continuous">
+  	<axis xyz="0 0 1"/>
+    <parent link="right_wheel_holder_link"/>
+    <child link="right_wheel_link"/>
+    <origin rpy="0 1.57075 0" xyz="0.15 0 0"/>
+  </joint>
+
+<!--   <transmission>
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_wheel_holder_to_left_wheel">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor_left">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+
+    <joint name="right_wheel_holder_to_left_wheel">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor_right">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+
+  </transmission>
+ -->
+
+</robot>
