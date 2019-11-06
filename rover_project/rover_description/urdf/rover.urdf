@@ -12,7 +12,7 @@
 
   <link name="base_link">
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.45"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <box size="1.0 1.0 0.2"/>
       </geometry>
@@ -25,18 +25,13 @@
         <box size="1.0 1.0 0.2"/>
       </geometry>
     </collision>
-
-    <inertial>
-      <mass value="5"/>
-      <inertia ixx="0.83333" ixy="0.0" ixz="0.0" iyy="0.433333" iyz="0.0" izz="0.433333"/>
-    </inertial>
   
   </link>
 
   <link name="right_wheel_holder_link">
 
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.45"/>
+      <origin rpy="0 0 0" xyz="0 0 -0.1"/>
       <geometry>
         <box size="0.3 0.2 0.2"/>
       </geometry>
@@ -52,75 +47,6 @@
     <inertial>
       <mass value="1"/>
       <inertia ixx="0.011" ixy="0.0" ixz="0.0" iyy="0.0067" iyz="0.0" izz="0.011"/>
-    </inertial>
-
-  </link>
-
-  <link name="left_wheel_holder_link">
-
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.45"/>
-      <geometry>
-        <box size="0.3 0.2 0.2"/>
-      </geometry>
-      <material name="blue"/>
-    </visual>
-
-    <collision>
-      <geometry>
-        <box size="0.3 0.2 0.2"/>
-      </geometry>
-    </collision>
-
-    <inertial>
-      <mass value="1"/>
-      <inertia ixx="0.011" ixy="0.0" ixz="0.0" iyy="0.0067" iyz="0.0" izz="0.011"/>
-    </inertial>
-
-  </link>
-
-  <link name="right_wheel_link">
-
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.45 0 0"/>
-      <geometry>
-        <cylinder length="0.05" radius="0.25"/>
-      </geometry>
-      <material name="grey"/>
-    </visual>
-
-    <collision>
-      <geometry>
-        <cylinder length="0.05" radius="0.25"/>
-      </geometry>
-    </collision>
-
-    <inertial>
-      <mass value="1"/>
-      <inertia ixx="0.00021" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.00021"/>
-    </inertial>
-
-  </link>
-
-  <link name="left_wheel_link">
-
-    <visual>
-    	<origin rpy="0 0 0" xyz="0.45 0 0"/>
-      <geometry>
-        <cylinder length="0.05" radius="0.25"/>
-      </geometry>
-      <material name="grey"/>
-    </visual>
-
-    <collision>
-      <geometry>
-        <cylinder length="0.05" radius="0.25"/>
-      </geometry>
-    </collision>
-
-    <inertial>
-      <mass value="1"/>
-      <inertia ixx="0.00021" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.00021"/>
     </inertial>
 
   </link>
@@ -128,48 +54,128 @@
   <joint name="base_to_right_wheel_holder" type="fixed">
     <parent link="base_link"/>
     <child link="right_wheel_holder_link"/>
-    <origin rpy="0 0 0" xyz="0.4 0.2 -0.2"/>
+    <origin rpy="0 0 0" xyz="0.4 0.2 -0.1"/>
   </joint>
+
+  <link name="left_wheel_holder_link">
+
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 -0.1"/>
+      <geometry>
+        <box size="0.3 0.2 0.2"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.3 0.2 0.2"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.011" ixy="0.0" ixz="0.0" iyy="0.0067" iyz="0.0" izz="0.011"/>
+    </inertial>
+
+  </link>
 
   <joint name="base_to_left_wheel_holder" type="fixed">
     <parent link="base_link"/>
     <child link="left_wheel_holder_link"/>
-    <origin rpy="0 0 0" xyz="-0.4 0.2 -0.2"/>
+    <origin rpy="0 0 0" xyz="-0.4 0.2 -0.1"/>
   </joint>
 
-  <joint name="left_wheel_holder_to_left_wheel" type="continuous">
+  <link name="right_wheel_link">
+
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.025"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.00021" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.00021"/>
+    </inertial>
+
+  </link>
+
+  <joint name="holder2wheel_right" type="continuous">
+    <axis xyz="0 0 1"/>
+    <parent link="right_wheel_holder_link"/>
+    <child link="right_wheel_link"/>
+    <origin rpy="0 1.57075 0" xyz="0.15 0 -0.1"/>
+  </joint>
+
+  <link name="left_wheel_link">
+
+    <visual>
+    	<origin rpy="0 0 0" xyz="0 0 0.025"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <cylinder length="0.05" radius="0.25"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx="0.00021" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.00021"/>
+    </inertial>
+
+  </link>
+
+  <joint name="holder2wheel_left" type="continuous">
   	<axis xyz="0 0 1"/>
     <parent link="left_wheel_holder_link"/>
     <child link="left_wheel_link"/>
-    <origin rpy="0 -1.57075 0" xyz="-0.15 0 0"/>
+    <origin rpy="0 -1.57075 0" xyz="-0.15 0 -0.1"/>
   </joint>
 
-  <joint name="right_wheel_holder_to_right_wheel" type="continuous">
-  	<axis xyz="0 0 1"/>
-    <parent link="right_wheel_holder_link"/>
-    <child link="right_wheel_link"/>
-    <origin rpy="0 1.57075 0" xyz="0.15 0 0"/>
-  </joint>
+  
 
-  <transmission>
+  <transmission name="tran1">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name="left_wheel_holder_to_left_wheel">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
+    <joint name="holder2wheel_left">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
     </joint>
     <actuator name="motor_left">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
+  </transmission>
 
-    <joint name="right_wheel_holder_to_left_wheel">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
+  <transmission name="tran2">
+    
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="holder2wheel_right">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
     </joint>
     <actuator name="motor_right">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
 
   </transmission>
 
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/rover</robotNamespace>
+    </plugin>
+  </gazebo>
 
 </robot>
