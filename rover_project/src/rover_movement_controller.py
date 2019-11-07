@@ -9,7 +9,7 @@ def callService(rover_name):
 	rospy.wait_for_service("gazebo/get_model_state")
 	try:
 		get_model_state = rospy.ServiceProxy("gazebo/get_model_state", GetModelState)
-		current_state = get_model_state(rover_name, "dummy_link")
+		current_state = get_model_state(rover_name, "world")
 		return current_state 
 
 	except rospy.ServiceException as e:
