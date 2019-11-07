@@ -181,6 +181,11 @@
       <inertia ixx="0.008" ixy="0.0" ixz="0.0" iyy="0.008" iyz="0.0" izz="0.008"/>
     </inertial>
 
+    <gazebo reference="caster_link">
+      <mu1>0</mu1>
+      <mu2>0</mu2>
+    </gazebo>
+
   </link>
 
   <joint name="base2caster" type="fixed">

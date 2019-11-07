@@ -8,9 +8,8 @@ rover:
   left_wheel:
     type: velocity_controllers/JointVelocityController
     joint: holder2wheel_left
-    # pid: {p: 100.0, i: 0.01, d: 10.0}
 
   right_wheel:
     type: velocity_controllers/JointVelocityController
     joint: holder2wheel_right
-    # pid: {p: 100.0, i: 0.01, d: 10.0}
+
