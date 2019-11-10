@@ -54,6 +54,8 @@ TIM_HandleTypeDef htim4;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+const int32_t L = 160 + 5 + 5; // in 170 mm
+const int32_t R = 40; // 40 mm
 uint32_t input_capture_prev1 = 0;
 uint32_t input_capture1 = 0;
 uint16_t n_pulse1 = 0;
@@ -80,14 +82,12 @@ uint16_t returned_pwm2 = 0;
 
 uint8_t i = 0;
 uint8_t give_command = 0;
-uint16_t b = 100;
-uint16_t v_max = 10; // in 10*mm/s
 
 struct rover_position
 {
 	int32_t x;
 	int32_t y;
-	int32_t phi; // 100*Radian
+	float phi; // Radian
 
 	int32_t trg_x;
 	int32_t trg_y;
@@ -495,7 +495,24 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 		returned_pwm1 = pid_controller_wheels(n_pulse1, n_pulse_set1, 1);
 		returned_pwm2 = pid_controller_wheels(n_pulse2, n_pulse_set2, 2);
 
+		if (wheel_dir1 == 1) // Pin A0
+		{
+			HAL_GPIO_WritePin(GPIOA, 0, 1);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, 0, 0);
+		}
 		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, returned_pwm1);
+
+		if (wheel_dir2 == 1) // Pin A1
+		{
+			HAL_GPIO_WritePin(GPIOA, 1, 1);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, 1, 0);
+		}
 		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, returned_pwm2);
 	}
 }
@@ -555,7 +572,7 @@ uint8_t processUserInput(uint8_t opt) {
 	case 2: // Print out speed
 		sprintf(msg1, "\r\n x: %ld", my_rover.x);
 		sprintf(msg2, "\r\n y: %ld", my_rover.y);
-		sprintf(msg3, "\r\n phi: %ld", my_rover.phi);
+		sprintf(msg3, "\r\n phi: %f", my_rover.phi);
 		sprintf(msg4, "\r\n PWM: %u", returned_pwm1);
 		sprintf(msg5, "\r\n error1: %ld", error1);
 		sprintf(msg6, "\r\n integrated_error1: %ld", integrated_error1);
@@ -625,51 +642,98 @@ uint16_t pid_controller_wheels(uint16_t current_point, uint16_t desired_point, u
 
 void update_my_position(void)
 {
-	int32_t s1 = 0;
-	int32_t s2 = 0;
-	int32_t s_mean = 0;
+	float s1 = 0;
+	float s2 = 0;
+	float s_mean = 0;
 
-	s1 = 280*n_pulse1; // in 10*mm
-	s2 = 280*n_pulse2; // in 10*mm
-	s_mean = (s1+s2)/2;
+	s1 = wheel_dir1*n_pulse1/270.0*3.14*R;
+	s2 = wheel_dir2*n_pulse2/270.0*3.14*R;
 
-	my_rover.x += s_mean*cos(((float)my_rover.phi)/100.0); // in 10*mm
-	my_rover.y += s_mean*sin(((float)my_rover.phi)/100.0); // in 10*mm
-	my_rover.phi += 10*(s2-s1)/(2*b); // in 100*rad
+	s_mean = (s1+s2)/2.0;
 
-	my_rover.phi = atan(sin((double) my_rover.phi)/cos((double) my_rover.phi)); // map phi between [-pi,pi]
+	my_rover.x += s_mean*cos(my_rover.phi); // in 10*mm
+	my_rover.y += s_mean*sin(my_rover.phi); // in 10*mm
+	my_rover.phi += (s2-s1)/L; // in rad
+
+	my_rover.phi = atan2(sin((double) my_rover.phi),cos((double) my_rover.phi)); // map phi between [-pi,pi]
+}
+
+float heading_pid_controller(float error_heading)
+{
+	int8_t kp = 4;
+	float angular_vel;
+
+	angular_vel = kp*error_heading;
+
+	return angular_vel;
 }
 
 void calculate_new_speed(void)
 {
 	int32_t dx,dy;
-	int32_t dphi;
-	int32_t phi_d;
+	float error_heading;
+
 	int32_t u1,u2;
-	int32_t v_s, w;
+
 	int32_t k;
+	int32_t error_distance;
+	int32_t linear_vel;
+	float angular_vel;
+	float desired_heading;
+
+	float left_wheel_cmd, right_wheel_cmd;
 
 	// Calculate error vector
 	dx = my_rover.trg_x - my_rover.x;
 	dy = my_rover.trg_y - my_rover.y;
 
-	// Calculate control vector u
-	k = v_max*atan(sqrt((double)(dx*dx + dy*dy))/10.0);
-	u1 = k*dx;
-	u2 = k*dy;
+	error_distance = sqrt(dx*dx+dy*dy);
 
-	// Calculate the required heading and delta phi
-	phi_d = atan(((double)u2)/u1)*100; // in 100*rad
-	dphi = phi_d - my_rover.phi;
-	dphi = atan(sin((double)dphi)/cos((double)dphi));
+	if (error_distance == 0)
+	{
+		my_rover.trg_wheel_spd1 = 0;
+		my_rover.trg_wheel_spd2 = 0;
+		return;
+	}
+	else
+	{
+		// Calculate control vector u
+		k = atan(error_distance);
+		u1 = k*dx/error_distance;
+		u2 = k*dy/error_distance;
+	}
 
-	// Calculate rotation and linear velocity
-	v_s = sqrt((double)(u1*u1 + u2*u2));
-		// calculate rotation velocity using PID controller
+	linear_vel = sqrt(u1*u1 + u2*u2);
+
+	desired_heading = atan2(u2,u1);
+	error_heading = atan2(sin(desired_heading - my_rover.phi),cos(desired_heading - my_rover.phi));
+
+	angular_vel = heading_pid_controller(error_heading);
+
+	left_wheel_cmd = (2*linear_vel - angular_vel*L)/(2*R);
+	right_wheel_cmd = (2*linear_vel + angular_vel*L)/(2*R);
+
+	if (left_wheel_cmd > 0)
+	{
+		wheel_dir1 = 1;
+	}
+	else
+	{
+		wheel_dir1 = -1;
+	}
+
+	if (right_wheel_cmd > 0)
+	{
+		wheel_dir2 = 1;
+	}
+	else
+	{
+		wheel_dir2 = -1;
+	}
 
 	// Calculate the wheel speed
-	my_rover.trg_wheel_spd1 = (2*v_s+w*b)/2;
-	my_rover.trg_wheel_spd2 = (2*v_s-w*b)/2;
+	my_rover.trg_wheel_spd1 = left_wheel_cmd;
+	my_rover.trg_wheel_spd2 = right_wheel_cmd;
 
 }
 
