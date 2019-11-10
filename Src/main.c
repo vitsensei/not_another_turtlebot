@@ -85,12 +85,12 @@ uint8_t give_command = 0;
 
 struct rover_position
 {
-	int32_t x;
-	int32_t y;
+	float x;
+	float y;
 	float phi; // Radian
 
-	int32_t trg_x;
-	int32_t trg_y;
+	float trg_x;
+	float trg_y;
 
 	int32_t trg_wheel_spd1;
 	int32_t trg_wheel_spd2;
@@ -570,9 +570,9 @@ uint8_t processUserInput(uint8_t opt) {
 		break;
 
 	case 2: // Print out speed
-		sprintf(msg1, "\r\n x: %ld", my_rover.x);
-		sprintf(msg2, "\r\n y: %ld", my_rover.y);
-		sprintf(msg3, "\r\n phi: %f", my_rover.phi);
+		sprintf(msg1, "\r\n x: %d", (int) my_rover.x);
+		sprintf(msg2, "\r\n y: %d", (int) my_rover.y);
+		sprintf(msg3, "\r\n phi: %d", (int) my_rover.phi);
 		sprintf(msg4, "\r\n PWM: %u", returned_pwm1);
 		sprintf(msg5, "\r\n error1: %ld", error1);
 		sprintf(msg6, "\r\n integrated_error1: %ld", integrated_error1);
@@ -670,14 +670,14 @@ float heading_pid_controller(float error_heading)
 
 void calculate_new_speed(void)
 {
-	int32_t dx,dy;
+	float dx,dy;
 	float error_heading;
 
-	int32_t u1,u2;
+	float u1,u2;
 
-	int32_t k;
-	int32_t error_distance;
-	int32_t linear_vel;
+	float k;
+	float error_distance;
+	float linear_vel;
 	float angular_vel;
 	float desired_heading;
 
