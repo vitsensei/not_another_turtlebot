@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <world name="default">
+    <physics:ode>
+      <updateRate>-1</updateRate>
+    </physics:ode>
+  </world>
+</sdf>

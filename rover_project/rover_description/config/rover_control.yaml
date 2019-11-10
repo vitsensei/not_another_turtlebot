@@ -1,0 +1,15 @@
+rover:
+  # Publish all joint states -----------------------------------
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50  
+
+  # Position Controllers ---------------------------------------
+  left_wheel:
+    type: velocity_controllers/JointVelocityController
+    joint: holder2wheel_left
+
+  right_wheel:
+    type: velocity_controllers/JointVelocityController
+    joint: holder2wheel_right
+
