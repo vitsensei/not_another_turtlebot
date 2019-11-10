@@ -2,9 +2,10 @@
   <include file="$(find gazebo_ros)/launch/empty_world.launch">	
   </include>
 
+
   <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" ns="/rover" args="-file $(find rover_project)/rover_description/urdf/rover.urdf -urdf -z 1 -model rover" />
 
-  <param name="/use_sim_time" value="true"/>
+  <!-- <param name="/use_sim_time" value="true"/> -->
   <param name="robot_description" command="cat $(find rover_project)/rover_description/urdf/rover.urdf"/>
   <!-- Load joint controller configurations from YAML file to parameter server -->
   <rosparam file="$(find rover_project)/rover_description/config/rover_control.yaml" command="load"/>
