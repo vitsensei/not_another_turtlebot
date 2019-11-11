@@ -58,30 +58,30 @@ const int32_t L = 160 + 5 + 5; // in 170 mm
 const int32_t R = 40; // 40 mm
 uint32_t input_capture_prev1 = 0;
 uint32_t input_capture1 = 0;
-uint16_t n_pulse1 = 0;
-uint16_t n_pulse_set1 = 0;
+uint32_t n_pulse1 = 0;
+uint32_t n_pulse_set1 = 0;
 
 uint32_t input_capture_prev2 = 0;
 uint32_t input_capture2=0;
-uint16_t n_pulse2 = 0;
-uint16_t n_pulse_set2 = 0;
+uint32_t n_pulse2 = 0;
+uint32_t n_pulse_set2 = 0;
 
 int32_t wheel_speed1 = 0;
 int32_t wheel_speed2 = 0;
 
-uint8_t wheel_dir1 = 1;
-uint8_t wheel_dir2 = 1;
+uint32_t wheel_dir1 = 1;
+uint32_t wheel_dir2 = 1;
 
 int32_t error1 = 0;
 int32_t integrated_error1 = 0;
 int32_t error2 = 0;
 int32_t integrated_error2 = 0;
 
-uint16_t returned_pwm1 = 0;
-uint16_t returned_pwm2 = 0;
+uint32_t returned_pwm1 = 0;
+uint32_t returned_pwm2 = 0;
 
-uint8_t i = 0;
-uint8_t give_command = 0;
+uint32_t i = 0;
+uint32_t give_command = 0;
 
 struct rover_position
 {
@@ -96,7 +96,7 @@ struct rover_position
 	int32_t trg_wheel_spd2;
 };
 
-struct rover_position my_rover = {0,0,157,0,0,0,0};
+struct rover_position my_rover = {0,0,1.5708,0,0,0,0};
 
 /* USER CODE END PV */
 
@@ -109,11 +109,12 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void printWelcomeMessage(void);
-uint8_t processUserInput(uint8_t opt);
-uint8_t readUserInput(void);
-uint16_t pid_controller_wheels(uint16_t current_point, uint16_t desired_point, uint8_t wheel_id);
+uint32_t processUserInput(uint32_t opt);
+uint32_t readUserInput(void);
+uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, uint32_t wheel_id);
 void calculate_new_speed(void);
 void update_my_position(void);
+float heading_pid_controller(float error_heading);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -128,7 +129,7 @@ void update_my_position(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	uint8_t opt;
+	uint32_t opt;
   /* USER CODE END 1 */
   
 
@@ -237,7 +238,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE BEGIN TIM2_Init 0 */
 	// TIMER2
-		// Frequency 100 KHz
+		// Frequency 1 KHz
 		//
   /* USER CODE END TIM2_Init 0 */
 
@@ -248,7 +249,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 80-1;
+  htim2.Init.Prescaler = 8000-1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 4294967295;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -357,7 +358,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 8000-1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 50-1;
+  htim4.Init.Period = 100-1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_OC_Init(&htim4) != HAL_OK)
@@ -463,7 +464,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
-//	uint8_t pw_array_length = PW_ARRAY_LENGTH;
+//	uint32_t pw_array_length = PW_ARRAY_LENGTH;
 	if ((htim->Instance == TIM2) && (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)) // measure the speed of wheel 1
 	{
 		input_capture1++;
@@ -477,8 +478,6 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
-
-
 	if ((htim->Instance == TIM4) && (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) && give_command == 1)
 	{
 		HAL_GPIO_TogglePin(GPIOA, LD2_Pin);
@@ -489,29 +488,29 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 		n_pulse2 = input_capture2 - input_capture_prev2;
 		input_capture_prev2 = input_capture2;
 
-		update_my_position();
-		calculate_new_speed();
+		// update_my_position();
+		// calculate_new_speed();
 
 		returned_pwm1 = pid_controller_wheels(n_pulse1, n_pulse_set1, 1);
 		returned_pwm2 = pid_controller_wheels(n_pulse2, n_pulse_set2, 2);
 
-		if (wheel_dir1 == 1) // Pin A0
+		if (wheel_dir1 == 1) // Pin C7
 		{
-			HAL_GPIO_WritePin(GPIOA, 0, 1);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, RESET);
 		}
 		else
 		{
-			HAL_GPIO_WritePin(GPIOA, 0, 0);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, SET);
 		}
 		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, returned_pwm1);
 
-		if (wheel_dir2 == 1) // Pin A1
+		if (wheel_dir2 == 1) // Pin A9
 		{
-			HAL_GPIO_WritePin(GPIOA, 1, 1);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, SET);
 		}
 		else
 		{
-			HAL_GPIO_WritePin(GPIOA, 1, 0);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, RESET);
 		}
 		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, returned_pwm2);
 	}
@@ -524,7 +523,7 @@ void printWelcomeMessage(void) {
 	HAL_UART_Transmit(&huart2, (uint8_t*)MAIN_MENU, strlen(MAIN_MENU), HAL_MAX_DELAY);
 }
 
-uint8_t readUserInput(void) {
+uint32_t readUserInput(void) {
 	char readBuf[1];
 
 	HAL_UART_Transmit(&huart2, (uint8_t*)PROMPT, strlen(PROMPT), HAL_MAX_DELAY);
@@ -533,7 +532,7 @@ uint8_t readUserInput(void) {
 }
 
 
-uint8_t processUserInput(uint8_t opt) {
+uint32_t processUserInput(uint32_t opt) {
 	char msg0[100] = "\r\nYour desired speed is: ";
 	char msg1[100];
 	char msg2[100];
@@ -542,13 +541,13 @@ uint8_t processUserInput(uint8_t opt) {
 	char msg5[100];
 	char msg6[100];
 	char readN_PULSE[3];
-	uint16_t n_pulse_received1 = 0;
+	int n_pulse_received1 = 0;
 
 
 	if(!opt || opt > 3)
 		return 0;
 
-	sprintf(msg1, "%d", opt);
+	sprintf(msg1, "%ld", opt);
 	HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
 
 	switch(opt) {
@@ -558,29 +557,32 @@ uint8_t processUserInput(uint8_t opt) {
 		HAL_UART_Receive(&huart2, (uint8_t*)readN_PULSE, 3, HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)readN_PULSE, 3, HAL_MAX_DELAY);
 		n_pulse_received1 = atoi(readN_PULSE);
-		if (n_pulse_received1 > 30)
+		if (abs(n_pulse_received1) > 60)
 		{
-			n_pulse_set1 = 30;
+			n_pulse_set1 = 60;
+			wheel_dir1 = n_pulse_received1/abs(n_pulse_received1);
 		}
 		else
 		{
-			n_pulse_set1 = n_pulse_received1;
+			n_pulse_set1 = abs(n_pulse_received1);
+			wheel_dir1 = n_pulse_received1/abs(n_pulse_received1);
 		}
+
 		give_command = 1;
 		break;
 
 	case 2: // Print out speed
-		sprintf(msg1, "\r\n x: %d", (int) my_rover.x);
-		sprintf(msg2, "\r\n y: %d", (int) my_rover.y);
-		sprintf(msg3, "\r\n phi: %d", (int) my_rover.phi);
-		sprintf(msg4, "\r\n PWM: %u", returned_pwm1);
+		sprintf(msg1, "\r\n input_capture_prev1: %lu", input_capture_prev1);
+		sprintf(msg2, "\r\n n_pulse_set1: %lu", n_pulse_set1);
+		sprintf(msg3, "\r\n n_pulse1: %lu", n_pulse1);
+		sprintf(msg4, "\r\n PWM: %lu", returned_pwm1);
 		sprintf(msg5, "\r\n error1: %ld", error1);
 		sprintf(msg6, "\r\n integrated_error1: %ld", integrated_error1);
 
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg3, strlen(msg3), HAL_MAX_DELAY);
-		HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg3), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg4), HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg5, strlen(msg5), HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg6, strlen(msg6), HAL_MAX_DELAY);
 
@@ -593,13 +595,13 @@ uint8_t processUserInput(uint8_t opt) {
 	return 1;
 }
 
-uint16_t pid_controller_wheels(uint16_t current_point, uint16_t desired_point, uint8_t wheel_id)
+uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, uint32_t wheel_id)
 {
 	int32_t Kp = -15;
 	int32_t Ki = -15;
 
 	int32_t output_pwm = 0;
-	uint16_t return_pwm = 0;
+	uint32_t return_pwm = 0;
 
 
 	if (wheel_id == 1)
@@ -634,7 +636,7 @@ uint16_t pid_controller_wheels(uint16_t current_point, uint16_t desired_point, u
 	}
 	else
 	{
-		return_pwm = (uint16_t) output_pwm;
+		return_pwm = (uint32_t) output_pwm;
 	}
 
 	return return_pwm;
@@ -732,8 +734,8 @@ void calculate_new_speed(void)
 	}
 
 	// Calculate the wheel speed
-	my_rover.trg_wheel_spd1 = left_wheel_cmd;
-	my_rover.trg_wheel_spd2 = right_wheel_cmd;
+	my_rover.trg_wheel_spd1 = (int) abs(left_wheel_cmd*(270*0.05)/(3.1415*R));
+	my_rover.trg_wheel_spd2 = (int) abs(right_wheel_cmd*(270*0.05)/(3.1415*R));
 
 }
 
@@ -759,7 +761,7 @@ void Error_Handler(void)
   * @param  line: assert_param error line source number
   * @retval None
   */
-void assert_failed(uint8_t *file, uint32_t line)
+void assert_failed(uint32_t *file, uint32_t line)
 { 
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
