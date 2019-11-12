@@ -69,7 +69,7 @@ uint32_t n_pulse_set2 = 0;
 int32_t wheel_speed1 = 0;
 int32_t wheel_speed2 = 0;
 
-uint32_t wheel_dir1 = 1;
+uint32_t wheel_dir1 = 1; // 1 means CW, -1 means CCW
 uint32_t wheel_dir2 = 1;
 
 int32_t error1 = 0;
@@ -346,7 +346,7 @@ static void MX_TIM4_Init(void)
 {
 
   /* USER CODE BEGIN TIM4_Init 0 */
-
+    // 10 Hz
   /* USER CODE END TIM4_Init 0 */
 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
@@ -358,7 +358,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 8000-1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 100-1;
+  htim4.Init.Period = 50-1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_OC_Init(&htim4) != HAL_OK)
@@ -557,11 +557,16 @@ uint32_t processUserInput(uint32_t opt) {
 		HAL_UART_Receive(&huart2, (uint8_t*)readN_PULSE, 3, HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)readN_PULSE, 3, HAL_MAX_DELAY);
 		n_pulse_received1 = atoi(readN_PULSE);
-		if (abs(n_pulse_received1) > 60)
+		if (abs(n_pulse_received1) > 30)
 		{
-			n_pulse_set1 = 60;
+			n_pulse_set1 = 30;
 			wheel_dir1 = n_pulse_received1/abs(n_pulse_received1);
 		}
+    else if (n_pulse_received1 == 0)
+    {
+      n_pulse_set1 = 0;
+      wheel_dir1 = 0;
+    }
 		else
 		{
 			n_pulse_set1 = abs(n_pulse_received1);
@@ -597,8 +602,8 @@ uint32_t processUserInput(uint32_t opt) {
 
 uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, uint32_t wheel_id)
 {
-	int32_t Kp = -15;
-	int32_t Ki = -15;
+	int32_t Kp = -10;
+	int32_t Ki = -2;
 
 	int32_t output_pwm = 0;
 	uint32_t return_pwm = 0;
@@ -609,7 +614,7 @@ uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, u
 		error1 = desired_point - current_point;
 		output_pwm = (Kp*error1) + (Ki*integrated_error1);
 
-		if ((abs(integrated_error1)<25) || ((error1*integrated_error1)<=0)) // anti winding
+		if ((abs(integrated_error1)<200) || ((error1*integrated_error1)<=0)) // anti winding
 		{
 			integrated_error1 += error1;
 		}
@@ -620,7 +625,7 @@ uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, u
 		error2 = desired_point - current_point;
 		output_pwm = (Kp*error2) + (Ki*integrated_error2);
 
-		if ((abs(integrated_error2)<20) || ((error2*integrated_error2)<=0)) // anti winding
+		if ((abs(integrated_error2)<200) || ((error2*integrated_error2)<=0)) // anti winding
 		{
 			integrated_error2 += error2;
 		}
@@ -653,11 +658,11 @@ void update_my_position(void)
 
 	s_mean = (s1+s2)/2.0;
 
-	my_rover.x += s_mean*cos(my_rover.phi); // in 10*mm
-	my_rover.y += s_mean*sin(my_rover.phi); // in 10*mm
+	my_rover.x += s_mean*cos(my_rover.phi); // in mm
+	my_rover.y += s_mean*sin(my_rover.phi); // in mm
 	my_rover.phi += (s2-s1)/L; // in rad
 
-	my_rover.phi = atan2(sin((double) my_rover.phi),cos((double) my_rover.phi)); // map phi between [-pi,pi]
+	my_rover.phi = atan2(sin(my_rover.phi),cos(my_rover.phi)); // map phi between [-pi,pi]
 }
 
 float heading_pid_controller(float error_heading)
@@ -691,7 +696,7 @@ void calculate_new_speed(void)
 
 	error_distance = sqrt(dx*dx+dy*dy);
 
-	if (error_distance == 0)
+	if (error_distance < 5)
 	{
 		my_rover.trg_wheel_spd1 = 0;
 		my_rover.trg_wheel_spd2 = 0;
@@ -701,8 +706,8 @@ void calculate_new_speed(void)
 	{
 		// Calculate control vector u
 		k = atan(error_distance);
-		u1 = k*dx/error_distance;
-		u2 = k*dy/error_distance;
+		u1 = k*dx;
+		u2 = k*dy;
 	}
 
 	linear_vel = sqrt(u1*u1 + u2*u2);
