@@ -54,52 +54,61 @@ TIM_HandleTypeDef htim4;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-const int32_t L = 160 + 5 + 5; // in 170 mm
-const int32_t R = 40; // 40 mm
+const float L = 170.0; // in 170 mm
+const float R = 40.0; // 40 mm
 uint32_t input_capture_prev1 = 0;
 uint32_t input_capture1 = 0;
-uint32_t n_pulse1 = 0;
-uint32_t n_pulse_set1 = 0;
+uint16_t n_pulse1 = 0;
 
 uint32_t input_capture_prev2 = 0;
 uint32_t input_capture2=0;
-uint32_t n_pulse2 = 0;
-uint32_t n_pulse_set2 = 0;
+uint16_t n_pulse2 = 0;
 
-int32_t wheel_speed1 = 0;
-int32_t wheel_speed2 = 0;
-
-uint32_t wheel_dir1 = 1; // 1 means CW, -1 means CCW
-uint32_t wheel_dir2 = 1;
+float wheel_dir1 = 1.0; // 1 means CW, -1 means CCW
+float wheel_dir2 = 1.0;
 
 int32_t error1 = 0;
 int32_t integrated_error1 = 0;
 int32_t error2 = 0;
 int32_t integrated_error2 = 0;
 
-uint32_t returned_pwm1 = 0;
-uint32_t returned_pwm2 = 0;
+uint16_t returned_pwm1 = 0;
+uint16_t returned_pwm2 = 0;
 
-uint32_t i = 0;
-uint32_t give_command = 0;
+uint8_t give_command = 0;
+
+float desired_heading;
+float u1,u2;
+float error_heading;
+float integrated_error_heading = 0;
+
+uint8_t counting = 0;
 
 struct rover_position
 {
-	int32_t x;
-	int32_t y;
-	int32_t phi; // Radian
+	float x;
+	float y;
+	float phi; // Radian
 
-	int32_t trg_x;
-	int32_t trg_y;
+	float dx;
+	float dy;
+	float dphi;
 
-	int32_t trg_wheel_spd1;
-	int32_t trg_wheel_spd2;
+	float s1;
+	float s2;
+	float s_mean;
 
-	int32_t angular_vel;
-	int32_t linear_vel;
+	float trg_x;
+	float trg_y;
+
+	uint16_t trg_wheel_spd1;
+	uint16_t trg_wheel_spd2;
+
+	float angular_vel;
+	float linear_vel;
 };
 
-struct rover_position my_rover = {0,0,157,0,0,0,0,0,0};
+struct rover_position my_rover = {0,0,1.57,0,0,0,0,0,0,0,0,0,0,0,0};
 
 /* USER CODE END PV */
 
@@ -117,7 +126,7 @@ uint32_t readUserInput(void);
 uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, uint32_t wheel_id);
 void calculate_new_speed(void);
 void update_my_position(void);
-void heading_pid_controller(int32_t error_heading);
+float heading_pid_controller(float error_heading);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -483,7 +492,9 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if ((htim->Instance == TIM4) && (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) && give_command == 1)
 	{
+		printf("------------ New state ------------\n");
 		HAL_GPIO_TogglePin(GPIOA, LD2_Pin);
+		counting++;
 
 		n_pulse1 = input_capture1 - input_capture_prev1;
 		input_capture_prev1 = input_capture1;
@@ -492,7 +503,10 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 		input_capture_prev2 = input_capture2;
 
 		 update_my_position();
-		 calculate_new_speed();
+		 if (counting == 10)	{
+			 counting = 0;
+			 calculate_new_speed();
+		 }
 
 		returned_pwm1 = pid_controller_wheels(n_pulse1, my_rover.trg_wheel_spd1, 1);
 		returned_pwm2 = pid_controller_wheels(n_pulse2, my_rover.trg_wheel_spd2, 2);
@@ -553,6 +567,8 @@ uint32_t processUserInput(uint32_t opt) {
 	char msg9[100];
 	char msg10[100];
 	char msg11[100];
+	char msg12[100];
+	char msg13[100];
 	char readN_PULSE[3];
 
 	if(!opt || opt > 3)
@@ -568,67 +584,40 @@ uint32_t processUserInput(uint32_t opt) {
 		HAL_UART_Receive(&huart2, (uint8_t*)readN_PULSE, 3, HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart2, (uint8_t*)readN_PULSE, 3, HAL_MAX_DELAY);
 
-		my_rover.trg_x = atoi(readN_PULSE)*100;
-		my_rover.trg_y = atoi(readN_PULSE)*100;
+		my_rover.trg_x = (float) atoi(readN_PULSE);
+		my_rover.trg_y = (float) atoi(readN_PULSE);
 
-		// n_pulse_received1 = atoi(readN_PULSE);
-		// if (abs(n_pulse_received1) > 30)
-		// {
-		// 	n_pulse_set1 = 30;
-		// 	wheel_dir1 = n_pulse_received1/abs(n_pulse_received1);
-		// }
-  //   else if (n_pulse_received1 == 0)
-  //   {
-  //     n_pulse_set1 = 0;
-  //     wheel_dir1 = 0;
-  //   }
-		// else
-		// {
-		// 	n_pulse_set1 = abs(n_pulse_received1);
-		// 	wheel_dir1 = n_pulse_received1/abs(n_pulse_received1);
-		// }
-
-		 give_command = 1;
+		give_command = 1;
 		break;
 
 	case 2: // Print out speed
-		// sprintf(msg1, "\r\n input_capture_prev1: %lu", input_capture_prev1);
-		// sprintf(msg2, "\r\n n_pulse_set1: %lu", n_pulse_set1);
-		// sprintf(msg3, "\r\n n_pulse1: %lu", n_pulse1);
-		// sprintf(msg4, "\r\n PWM: %lu", returned_pwm1);
-		// sprintf(msg5, "\r\n error1: %ld", error1);
-		// sprintf(msg6, "\r\n integrated_error1: %ld", integrated_error1);
+		sprintf(msg1, "\r\n X: %d", (int) (my_rover.x));
+		sprintf(msg2, "\r\n Y: %d", (int) (my_rover.y));
+		sprintf(msg3, "\r\n Phi (in degree): %d", (int) (my_rover.phi/3.14*180.0));
+		sprintf(msg4, "\r\n n_pulse1: %d", n_pulse1);
+		sprintf(msg5, "\r\n n_pulse2: %d", n_pulse2);
+		sprintf(msg6, "\r\n my_rover.trg_wheel_spd1: %d", my_rover.trg_wheel_spd1);
+		sprintf(msg7, "\r\n my_rover.trg_wheel_spd2: %d", my_rover.trg_wheel_spd2);
+		sprintf(msg8, "\r\n PWM 1: %u", returned_pwm1);
+		sprintf(msg9, "\r\n PWM 2: %u", returned_pwm2);
+		sprintf(msg10, "\r\n angular_vel in degree/s: %d", (int) (my_rover.angular_vel/3.1415*180.0));
+		sprintf(msg11, "\r\n linear_vel in mm/s: %d", (int) (my_rover.linear_vel));
+		sprintf(msg12, "\r\n Desired heading: %d, Error heading: %d", (int) (desired_heading/3.1415*180), (int) (error_heading/3.1415*180));
+		sprintf(msg13, "\r\n u1: %d, u2: %d", (int) (u1), (int) (u2));
 
-		// HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-		// HAL_UART_Transmit(&huart2, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-		// HAL_UART_Transmit(&huart2, (uint8_t*)msg3, strlen(msg3), HAL_MAX_DELAY);
-		// HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg4), HAL_MAX_DELAY);
-		// HAL_UART_Transmit(&huart2, (uint8_t*)msg5, strlen(msg5), HAL_MAX_DELAY);
-		// HAL_UART_Transmit(&huart2, (uint8_t*)msg6, strlen(msg6), HAL_MAX_DELAY);
-
-    sprintf(msg1, "\r\n X: %ld", my_rover.x);
-    sprintf(msg2, "\r\n Y: %ld", my_rover.y);
-    sprintf(msg3, "\r\n Phi: %ld", my_rover.phi);
-    sprintf(msg4, "\r\n n_pulse1: %ld", n_pulse1);
-    sprintf(msg5, "\r\n n_pulse2: %ld", n_pulse2);
-    sprintf(msg6, "\r\n n_pulse_set1: %ld", my_rover.trg_wheel_spd1);
-    sprintf(msg7, "\r\n n_pulse_set2: %ld", my_rover.trg_wheel_spd2);
-    sprintf(msg8, "\r\n PWM 1: %lu", returned_pwm1);
-	sprintf(msg9, "\r\n PWM 2: %lu", returned_pwm2);
-	sprintf(msg10, "\r\n angular_vel: %ld", my_rover.angular_vel);
-	sprintf(msg11, "\r\n linear_vel: %ld", my_rover.linear_vel);
-
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg3, strlen(msg3), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg4), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg5, strlen(msg5), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg6, strlen(msg6), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg7, strlen(msg7), HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg8, strlen(msg8), HAL_MAX_DELAY);
-	HAL_UART_Transmit(&huart2, (uint8_t*)msg9, strlen(msg9), HAL_MAX_DELAY);
-	HAL_UART_Transmit(&huart2, (uint8_t*)msg10, strlen(msg10), HAL_MAX_DELAY);
-	HAL_UART_Transmit(&huart2, (uint8_t*)msg11, strlen(msg11), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg3, strlen(msg3), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg4, strlen(msg4), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg5, strlen(msg5), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg6, strlen(msg6), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg7, strlen(msg7), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg8, strlen(msg8), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg9, strlen(msg9), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg10, strlen(msg10), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg11, strlen(msg11), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg12, strlen(msg12), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t*)msg13, strlen(msg13), HAL_MAX_DELAY);
 
 		break;
 
@@ -670,9 +659,9 @@ uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, u
 		}
 	}
 
-	if (output_pwm < 0)
+	if (output_pwm < 50)
 	{
-		return_pwm = 0;
+		return_pwm = 50;
 	}
 	else if (output_pwm > 400)
 	{
@@ -688,95 +677,157 @@ uint32_t pid_controller_wheels(uint32_t current_point, uint32_t desired_point, u
 
 void update_my_position(void)
 {
-	int32_t s1 = 0;
-	int32_t s2 = 0;
-	int32_t s_mean = 0;
+  float dx,dy;
 
-	s1 = (int32_t) wheel_dir1*(n_pulse1/270.0)*3.14*R*0.05*100;
-	s2 = (int32_t) wheel_dir2*(n_pulse2/270.0)*3.14*R*0.05*100;
+  dx = my_rover.trg_x - my_rover.x;
+  dy = my_rover.trg_y - my_rover.y;
 
-	s_mean = (s1+s2)/2.0;
+  if ((abs(dx)<10) && (abs(dy)<10))
+  {
+    my_rover.trg_wheel_spd1 = 0;
+    my_rover.trg_wheel_spd2 = 0;
+    my_rover.linear_vel = 0.0;
+    my_rover.angular_vel = 0.0;
+    return;
+  }
 
-	my_rover.x += (int32_t) s_mean*cos(my_rover.phi/100.0); // in mm
-	my_rover.y += (int32_t) s_mean*sin(my_rover.phi/100.0); // in mm
-	my_rover.phi += (int32_t) (s2-s1)/L; // in 100*rad
+	my_rover.s1 = (float) wheel_dir1*((n_pulse1/270.0)*3.1415*2*R);
+	my_rover.s2 = (float) wheel_dir2*((n_pulse2/270.0)*3.1415*2*R);
 
-	my_rover.phi = (int32_t) atan2(sin((float) (my_rover.phi/100.0)),cos((float) (my_rover.phi/100.0)))*100; // map phi between [-pi,pi]
+	my_rover.s_mean = (float) (my_rover.s1+my_rover.s2)/2.0;
+
+	my_rover.dx = (float) my_rover.s_mean*cos(my_rover.phi); // in mm
+	my_rover.dy = (float) my_rover.s_mean*sin(my_rover.phi); // in mm
+	my_rover.dphi = (float) (my_rover.s2-my_rover.s1)/(2*L); // in rad
+
+	my_rover.x = my_rover.x + my_rover.dx;
+	my_rover.y = my_rover.y + my_rover.dy;
+	my_rover.phi = my_rover.phi + my_rover.dphi;
+
+	my_rover.phi = atan2(sin(my_rover.phi),cos(my_rover.phi)); // map phi between [-pi,pi]
+
+  if ((abs(dx)<10) && (abs(dy)<10))
+  {
+    my_rover.trg_wheel_spd1 = 0;
+    my_rover.trg_wheel_spd2 = 0;
+    my_rover.linear_vel = 0.0;
+    my_rover.angular_vel = 0.0;
+    return;
+  }
+
+	printf("# Update position\n");
+  printf("n_pulse1: %d\n", n_pulse1);
+  printf("n_pulse2: %d\n", n_pulse2);
+	printf("s1: %d\n", (int) (my_rover.s1*100));
+	printf("s2: %d\n", (int) (my_rover.s2*100));
+	printf("s_mean: %d\n", (int) (my_rover.s_mean*100));
+
+  printf("my_rover.phi: %d\n", (int) (my_rover.phi*100));
+
+	printf("dx: %d\n", (int) (my_rover.dx*100));
+	printf("dy: %d\n", (int) (my_rover.dy*100));
+	printf("dphi: %d\n", (int) (my_rover.dphi*100));
 }
 
-void heading_pid_controller(int32_t error_heading)
+float heading_pid_controller(float error_heading)
 {
-	int8_t kp = 4;
+	float kp = 0.5;
+	float ki = 0;
 
-	my_rover.angular_vel = kp*error_heading;
+	if (integrated_error_heading < 0.52 || integrated_error_heading*error_heading < 0)
+	{
+		integrated_error_heading += error_heading;
+	}
+
+	return kp*error_heading + ki*integrated_error_heading;
 
 }
 
 void calculate_new_speed(void)
 {
-	int32_t dx,dy;
-	int32_t error_heading;
+	float dx,dy;
 
-	int32_t u1,u2;
+	float k;
+	float error_distance;
 
-	int32_t k;
-	int32_t error_distance;
-
-	int32_t desired_heading;
-
-	int32_t left_wheel_cmd, right_wheel_cmd;
+	float left_wheel_cmd, right_wheel_cmd;
+	float faster_speed;
 
 	// Calculate error vector
 	dx = my_rover.trg_x - my_rover.x;
 	dy = my_rover.trg_y - my_rover.y;
 
-	error_distance = (int32_t) sqrt(dx*dx+dy*dy);
+	error_distance = sqrt(dx*dx+dy*dy);
 
-	if (error_distance < 5)
+	if ((abs(dx)<10) && (abs(dy)<10))
 	{
 		my_rover.trg_wheel_spd1 = 0;
 		my_rover.trg_wheel_spd2 = 0;
+		my_rover.linear_vel = 0.0;
+		my_rover.angular_vel = 0.0;
 		return;
 	}
 	else
 	{
 		// Calculate control vector u
-		k = (int32_t) atan(error_distance/100.0)*100;
-		u1 = (int32_t) k*dx/100.0;
-		u2 = (int32_t) k*dy/100.0;
+		k = atan(error_distance)/1.57*150.0;
+		u1 = k*dx/error_distance;
+		u2 = k*dy/error_distance;
 	}
 
-	my_rover.linear_vel = (int32_t) sqrt(u1*u1 + u2*u2);
+	my_rover.linear_vel = sqrt(u1*u1 + u2*u2);
 
-	desired_heading = (int32_t) atan2(u2,u1)*100;
-	error_heading = (int32_t) atan2(sin((desired_heading - my_rover.phi)/100.0),cos((desired_heading - my_rover.phi)/100.0))*100;
+	desired_heading = atan2(u2,u1);
+	error_heading = atan2(sin(desired_heading - my_rover.phi),cos(desired_heading - my_rover.phi));
 
-	heading_pid_controller(error_heading);
+	my_rover.angular_vel = heading_pid_controller(error_heading);
 
-	left_wheel_cmd = (int32_t) (2*my_rover.linear_vel - my_rover.angular_vel*L)/(2*R*100);
-	right_wheel_cmd = (int32_t) (2*my_rover.linear_vel + my_rover.angular_vel*L)/(2*R*100);
+	left_wheel_cmd = (2*my_rover.linear_vel - my_rover.angular_vel*L)/(2*R); // in rad/s
+	right_wheel_cmd = (2*my_rover.linear_vel + my_rover.angular_vel*L)/(2*R);
+
+	if ((abs(left_wheel_cmd) > 14) || (abs(right_wheel_cmd) > 14))
+	{
+		faster_speed = abs(left_wheel_cmd);
+		if (abs(right_wheel_cmd) > faster_speed)
+		{
+			faster_speed = abs(right_wheel_cmd);
+		}
+
+		left_wheel_cmd = left_wheel_cmd/faster_speed*11.635;
+		right_wheel_cmd = right_wheel_cmd/faster_speed*11.635;
+
+	}
+
 
 	if (left_wheel_cmd > 0)
 	{
-		wheel_dir1 = 1;
+		wheel_dir1 = 1.0;
 	}
 	else
 	{
-		wheel_dir1 = -1;
+		wheel_dir1 = -1.0;
 	}
 
 	if (right_wheel_cmd > 0)
 	{
-		wheel_dir2 = 1;
+		wheel_dir2 = 1.0;
 	}
 	else
 	{
-		wheel_dir2 = -1;
+		wheel_dir2 = -1.0;
 	}
 
 	// Calculate the wheel speed
-	my_rover.trg_wheel_spd1 = (int32_t) abs(left_wheel_cmd*(270)/(3.1415*R));
-	my_rover.trg_wheel_spd2 = (int32_t) abs(right_wheel_cmd*(270)/(3.1415*R));
+	my_rover.trg_wheel_spd1 = (uint16_t) abs(left_wheel_cmd*270/(3.1415*2))*0.05; // n_pulse
+	my_rover.trg_wheel_spd2 = (uint16_t) abs(right_wheel_cmd*270/(3.1415*2))*0.05;
+
+	printf("# Calculate new speed \n");
+	printf("Linear velocity: %d\n", (int) (my_rover.linear_vel*100));
+	printf("Angular velocity: %d\n", (int) (my_rover.angular_vel*100));
+	printf("Left cmd: %d\n", (int) (left_wheel_cmd*100));
+	printf("Right cmd: %d\n", (int) (right_wheel_cmd*100));
+	printf("Target n_pulse1: %d\n", (int) (my_rover.trg_wheel_spd1));
+	printf("Target n_pulse2 %d\n", (int) (my_rover.trg_wheel_spd2));
 
 }
 
